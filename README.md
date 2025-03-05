@@ -1,1 +1,1 @@
-# Ce-ojumu-dienasgr-mata
+# Ceļojumu dienasgrāmata.
