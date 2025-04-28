@@ -1,87 +1,149 @@
+import os
 import json
-from tabulate import tabulate
+from rich.console import Console
+from rich.table import Table
 
-class TravelDiary:
-    def __init__(self, filename="travel_data.json"):
-        self.filename = filename
-        self.trips = self.load_data()
+console = Console()
+DATA_FILE = "trips.json"
 
-    def load_data(self):
-        try:
-            with open(self.filename, "r", encoding="utf-8") as file:
-                return json.load(file)
-        except (FileNotFoundError, json.JSONDecodeError):
-            return []
+# Funkcija, lai ielādētu datus
+def load_data():
+    if not os.path.exists(DATA_FILE):
+        with open(DATA_FILE, "w", encoding="utf-8") as file:
+            json.dump([], file)
+    with open(DATA_FILE, "r", encoding="utf-8") as file:
+        trips = json.load(file)
 
-    def save_data(self):
-        with open(self.filename, "w", encoding="utf-8") as file:
-            json.dump(self.trips, file, indent=4, ensure_ascii=False)
+    # Automātiski pievieno aprakstu, ja nav
+    for trip in trips:
+        if "description" not in trip:
+            trip["description"] = "Nav apraksta"
+    return trips
 
-    def add_trip(self, destination, start_date, end_date, description):
-        trip = {
-            "destination": destination,
-            "start_date": start_date,
-            "end_date": end_date,
-            "description": description
-        }
-        self.trips.append(trip)
-        self.save_data()
-        print("Ceļojums pievienots!")
+# Funkcija, lai saglabātu datus
+def save_data(trips):
+    with open(DATA_FILE, "w", encoding="utf-8") as file:
+        json.dump(trips, file, indent=4, ensure_ascii=False)
 
-    def display_trips(self):
-        if not self.trips:
-            print("Nav pievienotu ceļojumu.")
+# Funkcija izvēlnes attēlošanai
+def show_menu():
+    table = Table(title="📌 CEĻOJUMU PĀRVALDĪBA 📌", style="blue")
+    table.add_column("Nr.", justify="center", style="cyan")
+    table.add_column("Darbība", justify="left", style="green")
+
+    menu_options = [
+        ("1", "Pievienot jaunu ceļojumu"),
+        ("2", "Skatīt visus ceļojumus"),
+        ("3", "Meklēt ceļojumu pēc galamērķa vai apraksta"),
+        ("4", "Rediģēt ceļojumu"),
+        ("5", "Dzēst ceļojumu"),
+        ("6", "Iziet"),
+    ]
+
+    for option in menu_options:
+        table.add_row(option[0], option[1])
+
+    console.print(table)
+
+# Funkcija ceļojumu attēlošanai
+def show_trips(trips):
+    if not trips:
+        console.print("[bold red]❌ Nav saglabātu ceļojumu![/bold red]")
+        return
+
+    table = Table(title="📍 Saglabātie ceļojumi 📍", style="yellow")
+    table.add_column("Nr.", justify="center", style="red")
+    table.add_column("Nosaukums", justify="left", style="green")
+    table.add_column("Galamērķis", justify="left", style="cyan")
+    table.add_column("Datums", justify="left", style="magenta")
+    table.add_column("Apraksts", justify="left", style="white")
+
+    for i, trip in enumerate(trips, 1):
+        table.add_row(str(i), trip["name"], trip["destination"], trip["date"], trip["description"])
+
+    console.print(table)
+
+# Funkcija jauna ceļojuma pievienošanai
+def add_trip(trips):
+    name = input("Ievadi ceļojuma nosaukumu: ")
+    destination = input("Ievadi galamērķi: ")
+    date = input("Ievadi datumu (YYYY-MM-DD): ")
+    description = input("Ievadi aprakstu par ceļojumu: ")
+
+    trips.append({"name": name, "destination": destination, "date": date, "description": description})
+    save_data(trips)
+    console.print(f"[bold green]✅ Ceļojums '{name}' pievienots![/bold green]")
+
+# Funkcija ceļojuma meklēšanai
+def search_trip(trips):
+    keyword = input("Ievadi meklējamo vārdu (galamērķī vai aprakstā): ").lower()
+    results = [trip for trip in trips if keyword in trip["destination"].lower() or keyword in trip["description"].lower()]
+
+    if results:
+        show_trips(results)
+    else:
+        console.print("[bold red]❌ Netika atrasts neviens ceļojums pēc meklēšanas kritērija![/bold red]")
+
+# Funkcija ceļojuma rediģēšanai
+def edit_trip(trips):
+    show_trips(trips)
+    try:
+        idx = int(input("Ievadi rediģējamā ceļojuma numuru: ")) - 1
+        if idx < 0 or idx >= len(trips):
+            console.print("[bold red]❌ Nepareizs numurs![/bold red]")
             return
-        print(tabulate(self.trips, headers="keys", tablefmt="grid"))
 
-    def search_trips(self, keyword):
-        results = [trip for trip in self.trips if keyword.lower() in trip["destination"].lower()]
-        if results:
-            print(tabulate(results, headers="keys", tablefmt="grid"))
-        else:
-            print("Nav atrastu ceļojumu pēc šī kritērija.")
+        trips[idx]["name"] = input("Jauns ceļojuma nosaukums: ")
+        trips[idx]["destination"] = input("Jauns galamērķis: ")
+        trips[idx]["date"] = input("Jauns datums (YYYY-MM-DD): ")
+        trips[idx]["description"] = input("Jauns apraksts: ")
 
-    def delete_trip(self, destination):
-        self.trips = [trip for trip in self.trips if trip["destination"].lower() != destination.lower()]
-        self.save_data()
-        print("Ceļojums dzēsts!")
+        save_data(trips)
+        console.print("[bold green]✅ Ceļojums veiksmīgi rediģēts![/bold green]")
+    except ValueError:
+        console.print("[bold red]❌ Nepareiza ievade![/bold red]")
 
-    def count_trips(self):
-        print(f"Kopējais ceļojumu skaits: {len(self.trips)}")
+# Funkcija ceļojuma dzēšanai
+def delete_trip(trips):
+    show_trips(trips)
+    try:
+        idx = int(input("Ievadi dzēšamā ceļojuma numuru: ")) - 1
+        if idx < 0 or idx >= len(trips):
+            console.print("[bold red]❌ Nepareizs numurs![/bold red]")
+            return
 
+        deleted = trips.pop(idx)
+        save_data(trips)
+        console.print(f"[bold green]✅ Ceļojums '{deleted['name']}' dzēsts![/bold green]")
+    except ValueError:
+        console.print("[bold red]❌ Nepareiza ievade![/bold red]")
 
+# Galvenā programma
 def main():
-    diary = TravelDiary()
+    trips = load_data()
+
     while True:
-        print("\n1. Pievienot ceļojumu")
-        print("2. Parādīt visus ceļojumus")
-        print("3. Meklēt ceļojumu")
-        print("4. Dzēst ceļojumu")
-        print("5. Kopējais ceļojumu skaits")
-        print("6. Iziet")
-        choice = input("Izvēlies darbību: ")
-        
+        os.system("cls" if os.name == "nt" else "clear")
+        show_menu()
+        choice = input("👉 Izvēlieties opciju: ")
+
         if choice == "1":
-            dest = input("Ievadi galamērķi: ")
-            start = input("Ievadi sākuma datumu: ")
-            end = input("Ievadi beigu datumu: ")
-            desc = input("Apraksts: ")
-            diary.add_trip(dest, start, end, desc)
+            add_trip(trips)
         elif choice == "2":
-            diary.display_trips()
+            show_trips(trips)
         elif choice == "3":
-            keyword = input("Ievadi meklējamo vārdu: ")
-            diary.search_trips(keyword)
+            search_trip(trips)
         elif choice == "4":
-            dest = input("Ievadi dzēšamā ceļojuma galamērķi: ")
-            diary.delete_trip(dest)
+            edit_trip(trips)
         elif choice == "5":
-            diary.count_trips()
+            delete_trip(trips)
         elif choice == "6":
-            print("Programma beidzas.")
+            console.print("[bold red]👋 Programma izieta![/bold red]")
             break
         else:
-            print("Nepareiza izvēle, mēģini vēlreiz.")
+            console.print("[bold red]❌ Nepareiza izvēle, mēģiniet vēlreiz![/bold red]")
+
+        input("\nNospiediet Enter, lai turpinātu...")
 
 if __name__ == "__main__":
     main()
