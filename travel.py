@@ -34,7 +34,7 @@ def show_menu():
     menu_options = [
         ("1", "Pievienot jaunu ceļojumu"),
         ("2", "Skatīt visus ceļojumus"),
-        ("3", "Meklēt ceļojumu pēc galamērķa vai apraksta"),
+        ("3", "Meklēt ceļojumu pēc galamērķa"),
         ("4", "Rediģēt ceļojumu"),
         ("5", "Dzēst ceļojumu"),
         ("6", "Iziet"),
@@ -76,7 +76,7 @@ def add_trip(trips):
 
 # Funkcija ceļojuma meklēšanai
 def search_trip(trips):
-    keyword = input("Ievadi meklējamo vārdu (galamērķī vai aprakstā): ").lower()
+    keyword = input("Ievadi meklējamo vārdu (galamērķī): ").lower()
     results = [trip for trip in trips if keyword in trip["destination"].lower() or keyword in trip["description"].lower()]
 
     if results:
